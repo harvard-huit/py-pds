@@ -1,4 +1,4 @@
-"""Simple-Salesforce Package Setup"""
+"""PDS Package Setup"""
 
 import textwrap
 from pathlib import Path
