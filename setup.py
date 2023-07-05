@@ -21,7 +21,7 @@ setup(
     url=about['__url__'],
     license=about['__license__'],
     description=about['__description__'],
-    long_description=textwrap.dedent((here / 'README.rst').read_text()),
+    long_description='',
     long_description_content_type='text/x-rst',
     # package_data={},
     install_requires = [
