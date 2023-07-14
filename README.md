@@ -78,14 +78,14 @@ Next is probably the reason you're using this library. This helps simplify pagin
 import pds
 
 pds_api = pds.People(apikey-'12345', batch=50)
-response = pds_api(query={
+response = pds_api.search(query={
     "fields": [
         "univid"
     ],
     "conditions": {
         "names.name": "jazahn"
     }
-})
+}, pagination=True)
 
 total_results = response['total_results']
 results = response['results']
