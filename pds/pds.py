@@ -17,7 +17,7 @@ class People:
         self.count = 0
         self.total_count = 0
         self.batch_size = batch_size
-        self.pds_url = "https://go.apis.huit.harvard.edu/ats/person/v3/search?securityCategory=C"
+        self.pds_url = "https://go.apis.huit.harvard.edu/ats/person/v3/search"
 
         self.paginate = False
         self.session_id = None
@@ -112,11 +112,9 @@ class People:
             raise Exception(f"Error: failure with response from PDS: {response.status_code}:{response.text}")
         
 
-        if response.json()['count'] < 1:
-            return None
-        
-        if response.json()['count'] < self.batch_size:
-            return None
+        if(response.json()['count'] < 1):
+            # logger.warn(f"WARNING: PDS returned no results for: session_id: {self.session_id} with query: {self.last_query}")
+            return {}
 
         if 'session_id' in response.json():
             self.session_id = response.json()['session_id']
