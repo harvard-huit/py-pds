@@ -5,7 +5,7 @@ This file shamelessly taken from the simple-salesforce library, which in turn to
 __title__ = 'pds'
 __description__ = 'A basic PDS REST API client.'
 __url__ = 'https://github.huit.harvard.edu/HUIT/py-pds'
-__version__ = '1.0.1'
+__version__ = '1.0.2'
 __author__ = 'JaZahn Clevenger'
 __author_email__ = 'jcleveng@fas.harvard.edu'
 __license__ = 'MIT'
