@@ -6,7 +6,7 @@ from dotmap import DotMap
 logger = logging.getLogger(__name__)
 
 class People:
-    def __init__(self, apikey, batch_size=50):
+    def __init__(self, apikey, batch_size=50, retries=3, environment='prod'):
         if apikey == None:
             raise Exception("Error: apikey required")
 
@@ -17,8 +17,17 @@ class People:
         self.count = 0
         self.total_count = 0
         self.batch_size = batch_size
-        self.pds_url = "https://go.apis.huit.harvard.edu/ats/person/v3/search"
-
+        self.retries = retries
+        if environment == 'dev':
+            self.pds_url = "https://go.dev.apis.huit.harvard.edu/ats/person/v3/search"
+        if environment == 'test':
+            self.pds_url = "https://go.stage.apis.huit.harvard.edu/ats/person/v3/search?env=test"
+        if environment == 'stage':
+            self.pds_url = "https://go.stage.apis.huit.harvard.edu/ats/person/v3/search"
+        else:
+            # default should be prod
+            self.pds_url = "https://go.apis.huit.harvard.edu/ats/person/v3/search"
+        
         self.paginate = False
         self.session_id = None
 
@@ -65,33 +74,45 @@ class People:
 
         payload = query
 
-        #calling PDS api            
-        response = requests.post(self.pds_url, 
-            headers = headers,
-            params = params,
-            data =  json.dumps(payload))
+        #calling PDS api
+        for i in range(self.retries):
+            try:
+                response = requests.post(self.pds_url, 
+                    headers = headers,
+                    params = params,
+                    data =  json.dumps(payload))
+                if(response.status_code == 200):
+                    break
+                elif(response.status_code <= 400 and response.status_code < 500):
+                    # we don't need to retry client errors
+                    raise Exception(f"Error: failure with response from PDS: {response.status_code}:{response.text}")   
+                else:
+                    logger.warning(f"WARNING: PDS returned a non-200 response: {response.status_code}:{response.text} for query: {query}")
+                    logger.warning(f"WARNING: retrying {i+1} of {self.retries}")         
 
-        # logger.info(json.loads(response.text))
-        # logger.info(response.status_code)
-        if(response.status_code != 200):
-            raise Exception(f"Error: failure with response from PDS: {response.status_code}:{response.text}")
-        
-        if(response.json()['count'] < 1):
-            logger.warn(f"WARNING: PDS returned no results for: {query}")
+                if 'count' in response.json():
+                    if(response.json()['count'] < 1):
+                        logger.warning(f"PDS returned no results for: {query}")
+
+                    self.count = response.json()['count']
+                    self.total_count = response.json()['total_count']
+
+
+            except Exception as e:
+                logger.warning(f"WARNING: PDS returned an exception: {e} for query: {query}")
+                logger.warning(f"WARNING: retrying {i+1} of {self.retries}")
+
 
         if 'session_id' in response.json():
             self.session_id = response.json()['session_id']
         
-        self.count = response.json()['count']
-        self.total_count = response.json()['total_count']
-
         self.last_query = query
         self.response = response.json()
         return self.response
 
     def next(self) -> dict:
         if self.session_id is None:
-            logger.warn(f"WARNING: trying to paginate with no session_id available.")
+            logger.warning(f"WARNING: trying to paginate with no session_id available.")
             return []
 
         if self.apikey == None:
@@ -102,24 +123,36 @@ class People:
             "x-api-key": self.apikey
         }
 
-        #calling PDS api            
-        response = requests.post(self.pds_url + "/" + self.session_id, 
-            headers = headers)
+        #calling PDS api      
+        for i in range(self.retries):
+            try:
+                response = requests.post(self.pds_url + "/" + self.session_id, 
+                    headers = headers)
+                if(response.status_code == 200):
+                    break
+                elif(response.status_code <= 400 and response.status_code < 500):
+                    # we don't need to retry client errors
+                    raise Exception(f"Error: failure with response from PDS: {response.status_code}:{response.text}")   
+                else:
+                    logger.warning(f"WARNING: PDS returned a non-200 response: {response.status_code}:{response.text} for query: {self.last_query}")
+                    logger.warning(f"WARNING: retrying {i+1} of {self.retries}")      
 
-        # logger.info(json.loads(response.text))
-        # logger.info(response.status_code)
-        if(response.status_code != 200):
-            raise Exception(f"Error: failure with response from PDS: {response.status_code}:{response.text}")
-        
+                if 'count' in response.json():
+                    if(response.json()['count'] < 1):
+                        # this isn't a lack of results, it could be the end of the pages
+                        return {}
 
-        if(response.json()['count'] < 1):
-            # logger.warn(f"WARNING: PDS returned no results for: session_id: {self.session_id} with query: {self.last_query}")
-            return {}
+                    self.count = response.json()['count']
+                    self.total_count = response.json()['total_count']
+
+
+            except Exception as e:
+                logger.warning(f"WARNING: PDS returned an exception: {e} for query: {self.last_query}")
+                logger.warning(f"WARNING: retrying {i+1} of {self.retries}")
+              
 
         if 'session_id' in response.json():
             self.session_id = response.json()['session_id']
 
-        self.response = json.loads(response.text)
-        self.count = response.json()['count']
-        self.total_count = response.json()['total_count']
+        self.response = response.json()
         return self.response

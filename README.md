@@ -7,7 +7,7 @@ This library is meant to serve as a convenience library to using the PDS. This c
 Currently this can be installed directly from this repository with:
 
 ```
-pip install git+https://github.huit.harvard.edu/HUIT/py-pds.git@v1.0.1
+pip install git+https://github.huit.harvard.edu/HUIT/py-pds.git@v1.0.3
 ```
 
 ### Usage
