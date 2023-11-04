@@ -56,7 +56,7 @@ class People:
         return people
 
 
-    def search(self, query='', paginate=False) -> dict:
+    def search(self, query:str='', paginate: bool=False, session_timeout: int=None) -> dict:
         if self.apikey == None:
             raise Exception("Error: apikey required")
         
@@ -71,6 +71,8 @@ class People:
         if paginate:
             self.paginate = True
             params['paginate'] = True
+            if isinstance(session_timeout, int):
+                params['session_timeout'] = session_timeout
 
         payload = query
 
