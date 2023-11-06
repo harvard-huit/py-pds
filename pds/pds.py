@@ -19,6 +19,7 @@ class People:
         # self.response = {}
 
         self.is_paginating = False
+        self.pagination_type = 'queue' 
         self.result_queue = queue.Queue()
         self.results = []
 
@@ -160,19 +161,22 @@ class People:
 
         return response.json()
 
-    def start_pagination(self, query:str='', type:str='queue', wait:bool=False):
+    def start_pagination(self, query:str='', type:str=None, wait:bool=False):
         # Starts a pagination thread that will run through all results
         # adding them to either a 'queue' or a 'list'
+
+        if type:
+            self.pagination_type = type
 
         # do the first call
         response = self.search(query, paginate=True)
 
-        if type == 'queue':
+        if self.pagination_type == 'queue':
             self.result_queue.put(response['results'])
-        elif type == 'list':
+        elif self.pagination_type == 'list':
             self.results += response['results']
         else:
-            raise ValueError(f"Invalid type for pagination: ({type})")
+            raise ValueError(f"Invalid type for pagination: ({self.pagination_type})")
 
         if len(response['results']) < self.batch_size:
             logger.debug(f"No need to paginate.")
@@ -183,7 +187,7 @@ class People:
             if wait:
                 self.wait_for_pagination()
     
-    def pagination(self, type:str='queue'):
+    def pagination(self):
         self.is_paginating = True
         gotten_results = self.batch_size
         count = 2
@@ -201,12 +205,12 @@ class People:
                 logger.debug(f"{len(results)} results in page {count} -- {gotten_results}/{total_results}")
 
                 count += 1
-                if type == 'queue':
+                if self.pagination_type == 'queue':
                     self.result_queue.put(results)
-                elif type == 'list':
+                elif self.pagination_type == 'list':
                     self.results += results
                 else:
-                    raise ValueError(f"Invalid type for pagination: ({type})")
+                    raise ValueError(f"Invalid type for pagination: ({self.pagination_type})")
                 
                 if len(results) < self.batch_size:
                     logger.debug(f"Pagination reached end.")
@@ -219,7 +223,7 @@ class People:
         self.is_paginating = False
         return False
 
-    def wait_for_pagination(self, type:str='queue') -> bool:
+    def wait_for_pagination(self) -> bool:
         # blocks the thread until pagination is finished
         # returns true if there's mroe to do and false if everything is already processed
 
@@ -237,14 +241,14 @@ class People:
         
         return False
             
-    def next_page_results(self, type:str='queue'):
-        if type == 'queue':
+    def next_page_results(self):
+        if self.pagination_type == 'queue':
             if self.result_queue.qsize() > 0:
                 results = self.result_queue.get()
                 self.result_queue.task_done()
             else:
                 return []
-        elif type == 'list': 
+        elif self.pagination_type == 'list': 
             results = self.results[:self.batch_size]
             self.results = self.results[self.batch_size:]
         return results
