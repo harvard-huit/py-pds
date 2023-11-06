@@ -1,9 +1,3 @@
-## MOVED
-
-Due to the weird permissions we have on Github Enterprise, this has been moved to the harvard-huit org on github.com.
-
-https://github.com/harvard-huit/py-pds
-
 
 ## Person Data Service Python Library
 

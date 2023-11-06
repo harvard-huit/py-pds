@@ -1,6 +1,10 @@
 import requests
 import json
 import logging
+import threading
+import queue
+import time
+
 from dotmap import DotMap
 
 logger = logging.getLogger(__name__)
@@ -12,8 +16,12 @@ class People:
 
         self.apikey = apikey
         self.last_query = None
-        self.response = {}
+        # self.response = {}
+
+        self.is_paginating = False
+        self.result_queue = queue.Queue()
         self.results = []
+
         self.count = 0
         self.total_count = 0
         self.batch_size = batch_size
@@ -30,11 +38,6 @@ class People:
         
         self.paginate = False
         self.session_id = None
-
-    def __str__(self):
-        return str(self.response)
-    def __repr__(self):
-        return str(self.response)
 
     def get_people(self, query=''):
         response = self.search(query=query)
@@ -109,8 +112,7 @@ class People:
             self.session_id = response.json()['session_id']
         
         self.last_query = query
-        self.response = response.json()
-        return self.response
+        return response.json()
 
     def next(self) -> dict:
         if self.session_id is None:
@@ -156,5 +158,98 @@ class People:
         if 'session_id' in response.json():
             self.session_id = response.json()['session_id']
 
-        self.response = response.json()
-        return self.response
+        return response.json()
+
+    def start_pagination(self, query:str='', type:str='queue', wait:bool=False):
+        # Starts a pagination thread that will run through all results
+        # adding them to either a 'queue' or a 'list'
+
+        # do the first call
+        response = self.search(query, paginate=True)
+
+        if type == 'queue':
+            self.result_queue.put(response['results'])
+        elif type == 'list':
+            self.results += response['results']
+        else:
+            raise ValueError(f"Invalid type for pagination: ({type})")
+
+        if len(response['results']) < self.batch_size:
+            logger.debug(f"No need to paginate.")
+        else:
+            self.pagination_thread = threading.Thread(target=self.pagination, args=())
+            self.pagination_thread.start()
+
+            if wait:
+                self.wait_for_pagination()
+    
+    def pagination(self, type:str='queue'):
+        self.is_paginating = True
+        gotten_results = self.batch_size
+        count = 2
+        while True:
+            try:
+                # this sleep is necessary to not hit the 429 (rate limit)
+                time.sleep(1)
+                response = self.next()
+                if response is None or response is {}:
+                    break
+                results = response['results']
+                total_results = response['total_count']
+
+                gotten_results += len(results)
+                logger.debug(f"{len(results)} results in page {count} -- {gotten_results}/{total_results}")
+
+                count += 1
+                if type == 'queue':
+                    self.result_queue.put(results)
+                elif type == 'list':
+                    self.results += results
+                else:
+                    raise ValueError(f"Invalid type for pagination: ({type})")
+                
+                if len(results) < self.batch_size:
+                    logger.debug(f"Pagination reached end.")
+                    self.is_paginating = False
+                    return True
+            except Exception as e:
+                logger.error(f"Failure in pagination: {e}")
+                break
+        
+        self.is_paginating = False
+        return False
+
+    def wait_for_pagination(self, type:str='queue') -> bool:
+        # blocks the thread until pagination is finished
+        # returns true if there's mroe to do and false if everything is already processed
+
+        self.pagination_thread.join()
+
+        logger.debug(f"Finished thread")
+        if not self.result_queue.empty():
+            remaining = self.result_queue.qsize()
+            logger.debug(f"There are still {remaining} remaining queue batches.")
+            return True
+        if len(self.results) > 0:
+            remaining = len(self.results)
+            logger.debug(f"There are still {remaining} remaining records in the results list.")
+            return True
+        
+        return False
+            
+    def next_page_results(self, type:str='queue'):
+        if type == 'queue':
+            if self.result_queue.qsize() > 0:
+                results = self.result_queue.get()
+                self.result_queue.task_done()
+            else:
+                return []
+        elif type == 'list': 
+            results = self.results[:self.batch_size]
+            self.results = self.results[self.batch_size:]
+        return results
+
+
+
+
+
