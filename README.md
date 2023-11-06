@@ -5,10 +5,16 @@ This library is meant to serve as a convenience library to using the PDS. This c
 
 ### Installation
 
-Currently this can be installed directly from this repository with:
+IF you're a member of github.huit, this can be installed locally, directly from this repository with:
 
 ```
 pip install git+https://github.huit.harvard.edu/HUIT/py-pds.git@v1.0.3
+```
+
+However, if this is being deployed, you can't do that. (A docker image building this will most likely not be authenticated to github.huit as you are locally.) This will eventually make it to artifactory, but right now, it is being mirrored on public github, so you can use this:
+
+```
+pds @ git+https://github.com/harvard-huit/py-pds@v1.0.3
 ```
 
 ### Usage
