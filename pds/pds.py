@@ -88,21 +88,20 @@ class People:
                     params = params,
                     data =  json.dumps(payload))
                 if(response.status_code == 200):
+                    if 'count' in response.json():
+                        if(response.json()['count'] < 1):
+                            logger.warning(f"PDS returned no results for: {query}")
+
+                        self.count = response.json()['count']
+                        self.total_count = response.json()['total_count']
+
                     break
-                elif(response.status_code <= 400 and response.status_code < 500):
+                elif(response.status_code >= 400 and response.status_code < 500):
                     # we don't need to retry client errors
                     raise Exception(f"Error: failure with response from PDS: {response.status_code}:{response.text}")   
                 else:
                     logger.warning(f"WARNING: PDS returned a non-200 response: {response.status_code}:{response.text} for query: {query}")
                     logger.warning(f"WARNING: retrying {i+1} of {self.retries}")         
-
-                if 'count' in response.json():
-                    if(response.json()['count'] < 1):
-                        logger.warning(f"PDS returned no results for: {query}")
-
-                    self.count = response.json()['count']
-                    self.total_count = response.json()['total_count']
-
 
             except Exception as e:
                 logger.warning(f"WARNING: PDS returned an exception: {e} for query: {query}")
@@ -134,6 +133,14 @@ class People:
                 response = requests.post(self.pds_url + "/" + self.session_id, 
                     headers = headers)
                 if(response.status_code == 200):
+                    if 'count' in response.json():
+                        if(response.json()['count'] < 1):
+                            # this isn't a lack of results, it could be the end of the pages
+                            return {}
+
+                        self.count = response.json()['count']
+                        self.total_count = response.json()['total_count']
+
                     break
                 elif(response.status_code <= 400 and response.status_code < 500):
                     # we don't need to retry client errors
@@ -141,14 +148,6 @@ class People:
                 else:
                     logger.warning(f"WARNING: PDS returned a non-200 response: {response.status_code}:{response.text} for query: {self.last_query}")
                     logger.warning(f"WARNING: retrying {i+1} of {self.retries}")      
-
-                if 'count' in response.json():
-                    if(response.json()['count'] < 1):
-                        # this isn't a lack of results, it could be the end of the pages
-                        return {}
-
-                    self.count = response.json()['count']
-                    self.total_count = response.json()['total_count']
 
 
             except Exception as e:

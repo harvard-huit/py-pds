@@ -22,7 +22,7 @@ pip install -r requirements.txt
 
 While it's not recommended, you can also pull directly from source with the following:
 
-If you're a member of github.huit, this can be installed locally, directly from this repository with:
+If you're a member of github.huit, this can be installed *locally*, directly from this repository with:
 ```
 pip install git+https://github.huit.harvard.edu/HUIT/py-pds.git@v1.0.3
 ```
