@@ -40,7 +40,7 @@ jobs:
     #             echo "version=dev" >> $GITHUB_ENV
             
       - name: Build
-        uses: HUIT/build-pypi-action@main
+        uses: HUIT/build-pypi-action@v1.0.0
         with:
             index_user: hus397
             index_pass: ${{ secrets.ARTIFACTORY_PWD }}
