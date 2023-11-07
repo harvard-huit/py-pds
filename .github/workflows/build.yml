@@ -1,0 +1,48 @@
+name: Build Image
+run-name: Build Image ${{ github.event.inputs.version }}
+
+on:
+    workflow_dispatch:
+        # inputs:
+        #   version:
+        #     type: string
+        #     required: true
+#   push:
+#     branches: [ dev ]
+#     paths: 
+#         - 'pds/**'
+#         - '.github/workflows/build.yml'
+#         - 'setup.py'
+
+env:
+  branch: ${{ github.ref_name }}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: Build Code
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with: 
+            path: ./package
+      
+    #   - name: Determine Version
+    #     run: |
+    #         if [[ ${{ inputs.version }} ]]; then
+    #             echo "version=${{ inputs.version }}" >> $GITHUB_ENV
+    #         else
+    #             echo "version=dev" >> $GITHUB_ENV
+            
+      - name: Build
+        uses: HUIT/build-pypi-action@main
+        with:
+            index_user: hus397
+            index_pass: ${{ secrets.ARTIFACTORY_PWD }}
+            index_repository: ats-python
+            work_dir: package

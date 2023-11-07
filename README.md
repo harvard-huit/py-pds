@@ -106,11 +106,15 @@ while(True):
     # do something with results
 ```
 
-#### Pagination
+### Pagination
 
-Using `next()` is good, but this pagination process was created with async operations in mind. For example, if you're processing 100k records, you'll be getting a max of 1000 records and if you're doing something with them that might take longer than 3 min, the pagination process will time out before you get to call `next()` again. 
+The pagination process has a few ways it can be used. Synchronously, asynchronously and producing a queue of batches or a list. 
 
-That said, you can also use this process to just reduce your code. If you have the memory to hold all the records you're getting, you can just do this:
+Using `next()` is good, but this pagination process was created with async operations in mind. For example, if you're processing 100k records, you'll be getting a max of 1000 records and if you're doing something with them that might take longer than 3 min, the PDS pagination process will time out before you get to call `next()` again, which would force you to start it over again. 
+
+#### Synchronous Pagination
+
+Please note that getting a lot of records and holding them before processing could have an effect on memory. If you have the memory to hold all the records you're getting, you can just do this:
 
 ```
 import pds
@@ -124,16 +128,13 @@ query = {
     }
 }
 
-people.start_pagination(query, type='list')
-people.wait_for_pagination()
+people.start_pagination(query, type='list', wait=True)
 people_list = people.results
 ```
 
 That will give you the full list.
 
-#### Async Pagination
-
-The other way to deal with this would be to use it asyncronously. 
+#### Asynchronous Pagination
 
 ```
 import pds
@@ -149,15 +150,15 @@ query = {
 
 
 try:
-    pds.start_pagination(query)
+    people.start_pagination(query)
 
     while(True):
-        results = pds.next_page_results()
-        logger.info(f"doing something with {len(results)} results")
-        if len(results) < 1 and not pds.is_paginating:
+        results = people.next_page_results()
+        logger.info(f"doing something with this batch of {len(results)} results")
+        if len(results) < 1 and not people.is_paginating:
             break
         
 except Exception as e:
     logger.error(f"Something went wrong with the processing.")
-    pds.wait_for_pagination()
+    people.wait_for_pagination()
 ```
