@@ -5,14 +5,29 @@ This library is meant to serve as a convenience library to using the PDS. This c
 
 ### Installation
 
-IF you're a member of github.huit, this can be installed locally, directly from this repository with:
+#### Artifactory
 
+This is hosted in artifactory.huit. You can directly install it with pip with:
+```
+pip install --index-url https://artifactory.huit.harvard.edu/artifactory/api/pypi/ats-python/simple pds
+```
+
+If you have the dependency in a requirements file, the index-url needs to be set up in the config. It mirrors public pypi, so you can just:
+```
+pip config set global.index-url https://artifactory.huit.harvard.edu/artifactory/api/pypi/ats-python/simple
+pip install -r requirements.txt
+```
+
+#### Directly from source
+
+While it's not recommended, you can also pull directly from source with the following:
+
+If you're a member of github.huit, this can be installed locally, directly from this repository with:
 ```
 pip install git+https://github.huit.harvard.edu/HUIT/py-pds.git@v1.0.3
 ```
 
-However, if this is being deployed, you can't do that. (A docker image building this will most likely not be authenticated to github.huit as you are locally.) This will eventually make it to artifactory, but right now, it is being mirrored on public github, so you can use this:
-
+However, if this is being deployed, you can't do that. (A docker image building this will most likely not be authenticated to github.huit as you are locally.) This will eventually make it to artifactory, but right now, it is being mirrored on public github, so you can use this in your `requirements.txt`:
 ```
 pds @ git+https://github.com/harvard-huit/py-pds@v1.0.3
 ```
