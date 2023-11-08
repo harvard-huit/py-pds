@@ -21,6 +21,7 @@ class People:
         self.is_paginating = False
         self.pagination_type = 'queue' 
         self.result_queue = queue.Queue()
+        self.max_size = 50000
         self.results = []
 
         self.count = 0
@@ -160,9 +161,13 @@ class People:
 
         return response.json()
 
-    def start_pagination(self, query:str='', type:str=None, wait:bool=False):
+    def start_pagination(self, query:str='', type:str=None, wait:bool=False, max_size:int=None):
         # Starts a pagination thread that will run through all results
         # adding them to either a 'queue' or a 'list'
+        # max_size is the max we're allowing to be stored (cannot work with wait=True)
+
+        if max_size and not wait:
+            self.max_size = max_size
 
         if type:
             self.pagination_type = type
@@ -193,7 +198,19 @@ class People:
         while True:
             try:
                 # this sleep is necessary to not hit the 429 (rate limit)
-                time.sleep(1)
+                if self.pagination_type == 'list':
+                    current_results = len(self.results)
+                elif self.pagination_type == 'queue':
+                    current_results = self.batch_size * self.result_queue.qsize()
+                else:
+                    raise ValueError(f"Invalid pagination type: {self.pagination_type}")
+
+                # if we have accumulated a backlog of results larger than the "max_size", 
+                #   we should/can slow down. We can't stop as that would cause issues with pagination timeouts
+                if current_results > self.max_size:
+                    time.sleep(60)
+                else:
+                    time.sleep(1)
                 response = self.next()
                 if response is None or response is {}:
                     break
@@ -225,6 +242,9 @@ class People:
     def wait_for_pagination(self) -> bool:
         # blocks the thread until pagination is finished
         # returns true if there's mroe to do and false if everything is already processed
+
+        # we don't care about the max_size slowdown if we're just accumulating everything
+        self.max_size = None
 
         self.pagination_thread.join()
 
