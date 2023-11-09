@@ -10,15 +10,41 @@ from dotmap import DotMap
 logger = logging.getLogger(__name__)
 
 class People:
+    """
+    A class for interacting with the Harvard Person Data Service (PDS) API.
+
+    Attributes:
+    - apikey (str): The API key for accessing the PDS API.
+    - batch_size (int): The number of results to return per API call.
+    - retries (int): The number of times to retry an API call if it fails.
+    - environment (str): The environment to use for the PDS API (dev, test, stage, or prod).
+    - is_paginating (bool): Whether or not the API is currently paginating results.
+    - pagination_type (str): The type of pagination to use (queue or session).
+    - result_queue (queue.Queue): A queue for storing paginated results.
+    - max_size (int): The maximum number of results to return.
+    - results (list): A list of all results returned by the API.
+    - count (int): The number of results returned by the last API call.
+    - total_count (int): The total number of results available for the last API call.
+    - paginate (bool): Whether or not to paginate results.
+    - session_id (str): The ID of the current pagination session.
+    """
+
     def __init__(self, apikey, batch_size=50, retries=3, environment='prod'):
-        if apikey == None:
+        """
+        Initializes a new instance of the People class.
+
+        Args:
+        - apikey (str): The API key for accessing the PDS API.
+        - batch_size (int): The number of results to return per API call.
+        - retries (int): The number of times to retry an API call if it fails.
+        - environment (str): The environment to use for the PDS API (dev, test, stage, or prod).
+        """
+        if apikey is None:
             raise Exception("Error: apikey required")
 
         self.apikey = apikey
         self.last_query = None
-        # self.response = {}
 
-        # this is a helpful check to know if it's still going
         self.is_paginating = False
         self.pagination_type = 'queue' 
         self.result_queue = queue.Queue()
@@ -43,6 +69,15 @@ class People:
         self.session_id = None
 
     def get_people(self, query=''):
+        """
+        Searches the PDS API for people matching the given query.
+
+        Args:
+        - query (str): The query to search for.
+
+        Returns:
+        - A list of DotMap objects representing the people matching the query.
+        """
         response = self.search(query=query)
         results = response['results']
         people = []
@@ -54,6 +89,15 @@ class People:
         return people
 
     def make_people(self, results):
+        """
+        Converts a list of PDS API results into a list of DotMap objects representing people.
+
+        Args:
+        - results (list): A list of PDS API results.
+
+        Returns:
+        - A list of DotMap objects representing the people in the results.
+        """
         people = []
         for result in results:
             # dotmap allows us to access the items as names.name
@@ -63,6 +107,19 @@ class People:
 
 
     def pds_request(self, url:str, headers:dict={}, params:dict={}, payload:dict={}):
+        """
+        Sends a request to the PDS API.
+
+        Args:
+        - url (str): The URL to send the request to.
+        - headers (dict): The headers to include in the request.
+        - params (dict): The query parameters to include in the request.
+        - payload (dict): The payload to include in the request.
+
+        Returns:
+        - The response from the API.
+        """
+        logger = logging.getLogger(__name__)
 
         for i in range(self.retries):
             try:
@@ -103,7 +160,18 @@ class People:
 
 
     def search(self, query:str='', paginate: bool=False, session_timeout: int=None) -> dict:
-        if self.apikey == None:
+        """
+        Searches the PDS API for people matching the given query.
+
+        Args:
+        - query (str): The query to search for.
+        - paginate (bool): Whether or not to paginate results.
+        - session_timeout (int): The number of seconds to keep the pagination session alive.
+
+        Returns:
+        - A dictionary containing the results of the search.
+        """
+        if self.apikey is None:
             raise Exception("Error: apikey required")
         
         self.paginate = paginate
@@ -135,11 +203,17 @@ class People:
             return {}
 
     def next(self) -> dict:
+        """
+        Gets the next page of results from the current pagination session.
+
+        Returns:
+        - A dictionary containing the next page of results.
+        """
         if self.session_id is None:
             logger.warning(f"WARNING: trying to paginate with no session_id available.")
             return {}
 
-        if self.apikey == None:
+        if self.apikey is None:
             raise Exception("Error: apikey required")
 
         headers = {
@@ -157,9 +231,15 @@ class People:
             return {}
 
     def start_pagination(self, query:str='', type:str=None, wait:bool=False, max_size:int=None):
-        # Starts a pagination thread that will run through all results
-        # adding them to either a 'queue' or a 'list'
-        # max_size is the max we're allowing to be stored (cannot work with wait=True)
+        """
+        Starts a new pagination session.
+
+        Args:
+        - query (str): The query to search for.
+        - type (str): The type of pagination to use (queue or session).
+        - wait (bool): Whether or not to wait for the pagination session to complete.
+        - max_size (int): The maximum number of results to return.
+        """
 
         if max_size and not wait:
             self.max_size = max_size
@@ -192,7 +272,6 @@ class People:
         count = 2
         while True:
             try:
-                # this sleep is necessary to not hit the 429 (rate limit)
                 if self.pagination_type == 'list':
                     current_results = len(self.results)
                 elif self.pagination_type == 'queue':
@@ -205,6 +284,7 @@ class People:
                 if current_results > self.max_size:
                     time.sleep(60)
                 else:
+                    # this sleep is necessary to not hit the 429 (rate limit)
                     time.sleep(1)
                 response = self.next()
                 if response is None or response is {}:
