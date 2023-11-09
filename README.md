@@ -14,7 +14,7 @@ pip install --index-url https://artifactory.huit.harvard.edu/artifactory/api/pyp
 
 If you have the dependency in a requirements file, the index-url needs to be set up in the config. It mirrors public pypi, so you can just:
 ```
-pip config set global.index-url https://artifactory.huit.harvard.edu/artifactory/api/pypi/ats-python/simple
+pip config set global.extra-index-url https://artifactory.huit.harvard.edu/artifactory/api/pypi/ats-python/simple
 pip install -r requirements.txt
 ```
 
@@ -175,5 +175,4 @@ try:
         
 except Exception as e:
     logger.error(f"Something went wrong with the processing.")
-    people.wait_for_pagination()
 ```

@@ -18,6 +18,7 @@ class People:
         self.last_query = None
         # self.response = {}
 
+        # this is a helpful check to know if it's still going
         self.is_paginating = False
         self.pagination_type = 'queue' 
         self.result_queue = queue.Queue()
@@ -61,10 +62,53 @@ class People:
         return people
 
 
+    def pds_request(self, url:str, headers:dict={}, params:dict={}, payload:dict={}):
+
+        for i in range(self.retries):
+            try:
+                response = requests.post(url, 
+                    headers = headers,
+                    params = params,
+                    data =  json.dumps(payload))
+                if(response.status_code == 200):
+                    if 'count' in response.json():
+                        if(response.json()['count'] < 1 and payload):
+                            if payload:
+                                logger.warning(f"PDS returned no results for: {payload}")
+                        
+
+                        self.count = response.json()['count']
+                        self.total_count = response.json()['total_count']
+
+                        if 'session_id' in response.json():
+                            self.session_id = response.json()['session_id']
+
+                        return response
+
+                elif(response.status_code >= 400 and response.status_code < 500):
+                    # we don't need to retry client errors, right?
+                    raise Exception(f"Error: failure with response from PDS: {response.status_code}:{response.text}")   
+                else:
+                    if (i+1) >= self.retries:
+                        raise requests.exceptions.RetryError(f"Max retires ({self.retries}) reached on PDS.")
+                    else:
+                        logger.warning(f"WARNING: PDS returned a non-200 response: {response.status_code}:{response.text} for query: {self.last_query}")
+                        logger.warning(f"WARNING: retrying {i+1} of {self.retries}")         
+        
+            except requests.exceptions.RetryError as re:
+                raise re
+            except Exception as e:
+                logger.warning(f"WARNING: PDS returned an exception: {e} for query: {self.last_query}")
+                logger.warning(f"WARNING: retrying {i+1} of {self.retries}")
+
+
     def search(self, query:str='', paginate: bool=False, session_timeout: int=None) -> dict:
         if self.apikey == None:
             raise Exception("Error: apikey required")
         
+        self.paginate = paginate
+        self.session_id = None
+
         headers = {
             "Content-Type": "application/json",
             "x-api-key": self.apikey
@@ -82,43 +126,18 @@ class People:
         payload = query
 
         #calling PDS api
-        for i in range(self.retries):
-            try:
-                response = requests.post(self.pds_url, 
-                    headers = headers,
-                    params = params,
-                    data =  json.dumps(payload))
-                if(response.status_code == 200):
-                    if 'count' in response.json():
-                        if(response.json()['count'] < 1):
-                            logger.warning(f"PDS returned no results for: {query}")
-
-                        self.count = response.json()['count']
-                        self.total_count = response.json()['total_count']
-
-                    break
-                elif(response.status_code >= 400 and response.status_code < 500):
-                    # we don't need to retry client errors
-                    raise Exception(f"Error: failure with response from PDS: {response.status_code}:{response.text}")   
-                else:
-                    logger.warning(f"WARNING: PDS returned a non-200 response: {response.status_code}:{response.text} for query: {query}")
-                    logger.warning(f"WARNING: retrying {i+1} of {self.retries}")         
-
-            except Exception as e:
-                logger.warning(f"WARNING: PDS returned an exception: {e} for query: {query}")
-                logger.warning(f"WARNING: retrying {i+1} of {self.retries}")
-
-
-        if 'session_id' in response.json():
-            self.session_id = response.json()['session_id']
+        response = self.pds_request(self.pds_url, headers, params, payload)
         
         self.last_query = query
-        return response.json()
+        try: 
+            return response.json()
+        except AttributeError as ar:
+            return {}
 
     def next(self) -> dict:
         if self.session_id is None:
             logger.warning(f"WARNING: trying to paginate with no session_id available.")
-            return []
+            return {}
 
         if self.apikey == None:
             raise Exception("Error: apikey required")
@@ -129,37 +148,13 @@ class People:
         }
 
         #calling PDS api      
-        for i in range(self.retries):
-            try:
-                response = requests.post(self.pds_url + "/" + self.session_id, 
-                    headers = headers)
-                if(response.status_code == 200):
-                    if 'count' in response.json():
-                        if(response.json()['count'] < 1):
-                            # this isn't a lack of results, it could be the end of the pages
-                            return {}
+        next_url = f"{self.pds_url}/{self.session_id}"
+        response = self.pds_request(next_url, headers)
 
-                        self.count = response.json()['count']
-                        self.total_count = response.json()['total_count']
-
-                    break
-                elif(response.status_code <= 400 and response.status_code < 500):
-                    # we don't need to retry client errors
-                    raise Exception(f"Error: failure with response from PDS: {response.status_code}:{response.text}")   
-                else:
-                    logger.warning(f"WARNING: PDS returned a non-200 response: {response.status_code}:{response.text} for query: {self.last_query}")
-                    logger.warning(f"WARNING: retrying {i+1} of {self.retries}")      
-
-
-            except Exception as e:
-                logger.warning(f"WARNING: PDS returned an exception: {e} for query: {self.last_query}")
-                logger.warning(f"WARNING: retrying {i+1} of {self.retries}")
-              
-
-        if 'session_id' in response.json():
-            self.session_id = response.json()['session_id']
-
-        return response.json()
+        try: 
+            return response.json()
+        except AttributeError as ar:
+            return {}
 
     def start_pagination(self, query:str='', type:str=None, wait:bool=False, max_size:int=None):
         # Starts a pagination thread that will run through all results

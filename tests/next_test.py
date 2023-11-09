@@ -49,6 +49,7 @@ class TestNext(unittest.TestCase):
     @patch('pds.requests.post')
     def test_search_context_error(self, mock_search):
         bad_search_context_mock_response = Mock()
+        bad_search_context_mock_response.json = Mock()
         bad_search_context_mock_response.status_code = 401
         bad_search_context_mock_response.json.return_value = {
             "fault": {
