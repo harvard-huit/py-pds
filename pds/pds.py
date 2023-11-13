@@ -21,7 +21,7 @@ class People:
     - is_paginating (bool): Whether or not the API is currently paginating results.
     - pagination_type (str): The type of pagination to use (queue or session).
     - result_queue (queue.Queue): A queue for storing paginated results.
-    - max_size (int): The maximum number of results to return.
+    - max_backlog (int): The maximum number of results to return.
     - results (list): A list of all results returned by the API.
     - count (int): The number of results returned by the last API call.
     - total_count (int): The total number of results available for the last API call.
@@ -29,7 +29,7 @@ class People:
     - session_id (str): The ID of the current pagination session.
     """
 
-    def __init__(self, apikey, batch_size=50, retries=3, environment='prod'):
+    def __init__(self, apikey, batch_size=50, retries=3, session_timeout: int=3, environment='prod'):
         """
         Initializes a new instance of the People class.
 
@@ -37,6 +37,7 @@ class People:
         - apikey (str): The API key for accessing the PDS API.
         - batch_size (int): The number of results to return per API call.
         - retries (int): The number of times to retry an API call if it fails.
+        - session_timeout (int): The timeout between pagination calls. Defaults to 3 (minutes)
         - environment (str): The environment to use for the PDS API (dev, test, stage, or prod).
         """
         if apikey is None:
@@ -48,7 +49,7 @@ class People:
         self.is_paginating = False
         self.pagination_type = 'queue' 
         self.result_queue = queue.Queue()
-        self.max_size = 5000
+        self.max_backlog = 5000
         self.results = []
 
         self.count = 0
@@ -67,6 +68,7 @@ class People:
         
         self.paginate = False
         self.session_id = None
+        self.session_timeout = session_timeout
 
     def get_people(self, query=''):
         """
@@ -159,7 +161,7 @@ class People:
                 logger.warning(f"WARNING: retrying {i+1} of {self.retries}")
 
 
-    def search(self, query:str='', paginate: bool=False, session_timeout: int=None) -> dict:
+    def search(self, query:str='', paginate: bool=False) -> dict:
         """
         Searches the PDS API for people matching the given query.
 
@@ -188,8 +190,8 @@ class People:
         if paginate:
             self.paginate = True
             params['paginate'] = True
-            if isinstance(session_timeout, int):
-                params['session_timeout'] = session_timeout
+            if isinstance(self.session_timeout, int):
+                params['session_timeout'] = self.session_timeout
 
         payload = query
 
@@ -230,7 +232,7 @@ class People:
         except AttributeError as ar:
             return {}
 
-    def start_pagination(self, query:str='', type:str=None, wait:bool=False, max_size:int=None):
+    def start_pagination(self, query:str='', type:str=None, wait:bool=False, max_backlog:int=None):
         """
         Starts a new pagination session.
 
@@ -238,11 +240,11 @@ class People:
         - query (str): The query to search for.
         - type (str): The type of pagination to use (queue or session).
         - wait (bool): Whether or not to wait for the pagination session to complete.
-        - max_size (int): The maximum number of results to return.
+        - max_backlog (int): The maximum number of results to return.
         """
 
-        if max_size and not wait:
-            self.max_size = max_size
+        if max_backlog and not wait:
+            self.max_backlog = max_backlog
 
         if type:
             self.pagination_type = type
@@ -267,6 +269,12 @@ class People:
                 self.wait_for_pagination()
     
     def pagination(self):
+        """
+        Paginates through the results of a query, accumulating them in a list or queue depending on the pagination type.
+        If the number of accumulated results exceeds the max_backlog, the method slows down to avoid pagination timeouts.
+        The method returns True if pagination was successful, False otherwise.
+        """
+        
         self.is_paginating = True
         gotten_results = self.batch_size
         count = 2
@@ -279,13 +287,13 @@ class People:
                 else:
                     raise ValueError(f"Invalid pagination type: {self.pagination_type}")
 
-                # if we have accumulated a backlog of results larger than the "max_size", 
+                # if we have accumulated a backlog of results larger than the "max_backlog", 
                 #   we should/can slow down. We can't stop as that would cause issues with pagination timeouts
-                if self.max_size is not None:
-                    if current_results > self.max_size:
+                if self.max_backlog is not None:
+                    if current_results > self.max_backlog:
+                        time.sleep(60)
+                    elif current_results > 2 * self.max_backlog:
                         time.sleep(120)
-                    elif current_results > 2 * self.max_size:
-                        continue
 
                 # this sleep is necessary to not hit the 429 (rate limit)
                 time.sleep(1)
@@ -318,38 +326,68 @@ class People:
         return False
 
     def wait_for_pagination(self) -> bool:
-        # blocks the thread until pagination is finished
-        # returns true if there's mroe to do and false if everything is already processed
+            """
+            Blocks the thread until pagination is finished and returns a boolean indicating whether there is more to do.
 
-        # we don't care about the max_size slowdown if we're just accumulating everything
-        self.max_size = None
+            Returns:
+                bool: True if there is more to do, False otherwise.
+            """
+            # we don't care about the max_backlog slowdown if we're just accumulating everything
+            self.max_backlog = None
 
-        self.pagination_thread.join()
+            self.pagination_thread.join()
 
-        logger.debug(f"Finished thread")
-        if not self.result_queue.empty():
-            remaining = self.result_queue.qsize()
-            logger.debug(f"There are still {remaining} remaining queue batches.")
-            return True
-        if len(self.results) > 0:
-            remaining = len(self.results)
-            logger.debug(f"There are still {remaining} remaining records in the results list.")
-            return True
-        
-        return False
+            logger.debug(f"Finished thread")
+            if not self.result_queue.empty():
+                remaining = self.result_queue.qsize()
+                logger.debug(f"There are still {remaining} remaining queue batches.")
+                return True
+            if len(self.results) > 0:
+                remaining = len(self.results)
+                logger.debug(f"There are still {remaining} remaining records in the results list.")
+                return True
+            
+            return False
             
     def next_page_results(self):
-        if self.pagination_type == 'queue':
-            if self.result_queue.qsize() > 0:
-                results = self.result_queue.get()
-                self.result_queue.task_done()
-            else:
-                return []
-        elif self.pagination_type == 'list': 
-            results = self.results[:self.batch_size]
-            self.results = self.results[self.batch_size:]
-        return results
+            """
+            Returns the next batch of results from the API, based on the pagination type.
 
+            If pagination_type is 'queue', returns the next item in the result queue.
+            If pagination_type is 'list', returns the next batch of results from the results list.
+
+            If there are no more results to return, an empty list is returned.
+
+            If the method has been running for longer than session_timeout minutes, an error is logged and the method exits.
+
+            Returns:
+                list: The next batch of results from the API, or an empty list if there are no more results.
+            """
+            start_time = time.time()
+            while True:
+                if not self.is_paginating:
+                    return []
+
+                if self.pagination_type == 'queue':
+                    if self.result_queue.qsize() > 0:
+                        results = self.result_queue.get()
+                        self.result_queue.task_done()
+                        return results
+                    else:
+                        return []
+                elif self.pagination_type == 'list': 
+                    results = self.results[:self.batch_size]
+                    self.results = self.results[self.batch_size:]
+                    return results
+                
+                # if we've been in this loop longer than <session_timeout> minutes, 
+                #   let's end this
+                session_time_seconds = self.session_timeout * 60
+                if time.time() - start_time > session_time_seconds:
+                    logger.error(f"Something went wrong with fetching results.")
+                    break
+                # just hang out for 10 seconds
+                time.sleep(10)
 
 
 
