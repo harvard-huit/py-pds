@@ -12,7 +12,7 @@ This is hosted in artifactory.huit. You can directly install it with pip with:
 pip install --index-url https://artifactory.huit.harvard.edu/artifactory/api/pypi/ats-python/simple pds
 ```
 
-If you have the dependency in a requirements file, the index-url needs to be set up in the config. It mirrors public pypi, so you can just:
+If you have the dependency in a requirements file, the `extra-index-url`` needs to be set up in the config. Note that you should set `extra-index-url` and NOT `index-url` as that will overwrite your index (probably pypi.org).
 ```
 pip config set global.extra-index-url https://artifactory.huit.harvard.edu/artifactory/api/pypi/ats-python/simple
 pip install -r requirements.txt
@@ -151,7 +151,7 @@ That will give you the full list.
 
 #### Asynchronous Pagination
 
-```
+```py
 import pds
 
 people = pds.People(apikey=os.getenv('APIKEY'), batch_size=1000)
@@ -167,12 +167,11 @@ query = {
 try:
     people.start_pagination(query)
 
-    while(True):
-        results = people.next_page_results()
-        logger.info(f"doing something with this batch of {len(results)} results")
-        if len(results) < 1 and not people.is_paginating:
-            break
+    results = people.next_page_results()
+    logger.info(f"doing something with this batch of {len(results)} results")
+    if len(results) < 1 and not people.is_paginating:
+        break
         
 except Exception as e:
-    logger.error(f"Something went wrong with the processing.")
+    logger.error(f"Something went wrong with the processing. {e}")
 ```
