@@ -48,7 +48,7 @@ class People:
         self.is_paginating = False
         self.pagination_type = 'queue' 
         self.result_queue = queue.Queue()
-        self.max_size = 50000
+        self.max_size = 5000
         self.results = []
 
         self.count = 0
@@ -281,11 +281,14 @@ class People:
 
                 # if we have accumulated a backlog of results larger than the "max_size", 
                 #   we should/can slow down. We can't stop as that would cause issues with pagination timeouts
-                if current_results > self.max_size:
-                    time.sleep(60)
-                else:
-                    # this sleep is necessary to not hit the 429 (rate limit)
-                    time.sleep(1)
+                if self.max_size is not None:
+                    if current_results > self.max_size:
+                        time.sleep(120)
+                    elif current_results > 2 * self.max_size:
+                        continue
+
+                # this sleep is necessary to not hit the 429 (rate limit)
+                time.sleep(1)
                 response = self.next()
                 if response is None or response is {}:
                     break
