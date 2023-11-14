@@ -49,7 +49,7 @@ jobs:
 
       - name: Get Version
         run: |
-            version=pip freeze | grep "pds==" | cut -d'=' -f3
+            version=python -m pip freeze | grep "pds==" | cut -d'=' -f3
             echo "VERSION=version" >> $GITHUB_ENV
 
       - name: Version ${{ env.VERSION }}
