@@ -46,3 +46,11 @@ jobs:
             index_pass: ${{ secrets.ARTIFACTORY_PWD }}
             index_repository: ats-python
             work_dir: package
+
+      - name: Get Version
+        run: |
+            version=pip freeze | grep "pds==" | cut -d'=' -f3
+            echo "VERSION=version" >> $GITHUB_ENV
+
+      - name: Version ${{ env.VERSION }}
+        run: echo ${{ env.VERSION }}
