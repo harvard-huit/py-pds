@@ -238,9 +238,9 @@ class People:
 
         Args:
         - query (str): The query to search for.
-        - type (str): The type of pagination to use (queue or session).
+        - type (str): The type of pagination to use (`queue` or `list`). Defaults to queue. 
         - wait (bool): Whether or not to wait for the pagination session to complete.
-        - max_backlog (int): The maximum number of results to return.
+        - max_backlog (int): The maximum number of results to store in memory. This is ignored if `wait` is `True` and defaults to 5000.
         """
 
         if max_backlog and not wait:
@@ -273,6 +273,8 @@ class People:
         Paginates through the results of a query, accumulating them in a list or queue depending on the pagination type.
         If the number of accumulated results exceeds the max_backlog, the method slows down to avoid pagination timeouts.
         The method returns True if pagination was successful, False otherwise.
+
+        It's not expected for this to be called directly outside of start_pagination.
         """
         
         self.is_paginating = True
