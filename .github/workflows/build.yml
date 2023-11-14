@@ -47,10 +47,10 @@ jobs:
             index_repository: ats-python
             work_dir: package
 
-      - name: Get Version
-        run: |
-            version=python -m pip freeze | grep "pds==" | cut -d'=' -f3
-            echo "VERSION=version" >> $GITHUB_ENV
+    #   - name: Get Version
+    #     run: |
+    #         version=python -m pip freeze | grep "pds==" | cut -d'=' -f3
+    #         echo "VERSION=version" >> $GITHUB_ENV
 
-      - name: Version ${{ env.VERSION }}
-        run: echo ${{ env.VERSION }}
+    #   - name: Version ${{ env.VERSION }}
+    #     run: echo ${{ env.VERSION }}
