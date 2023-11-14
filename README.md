@@ -24,12 +24,12 @@ While it's not recommended, you can also pull directly from source with the foll
 
 If you're a member of github.huit, this can be installed *locally*, directly from this repository with:
 ```
-pip install git+https://github.huit.harvard.edu/HUIT/py-pds.git@v1.0.3
+pip install git+https://github.huit.harvard.edu/HUIT/py-pds.git@v1.1.0
 ```
 
 However, if this is being deployed, you can't do that. (A docker image building this will most likely not be authenticated to github.huit as you are locally.) This will eventually make it to artifactory, but right now, it is being mirrored on public github, so you can use this in your `requirements.txt`:
 ```
-pds @ git+https://github.com/harvard-huit/py-pds@v1.0.3
+pds @ git+https://github.com/harvard-huit/py-pds@v1.1.0
 ```
 
 ### Usage
@@ -45,6 +45,15 @@ pds_api = pds.People(apikey='12345', batch=50)
 Default batch is 50 and this won't work without a valid apikey, so if you don't have one, head over here: https://portal.apis.huit.harvard.edu/docs/ats-person-v3/1/overview
 
 Once that object is created, there are only a couple of methods for it. 
+
+### Methods
+
+ - [search](README.md#search): the core search method
+ - [next](README.md#next): the manual method to make a call for next result in a pagination session
+ - [start_pagination](README.md#Asynchronous+Pagination): create a pagination session to page through results
+ - [wait_for_pagination](README.md#Asynchronous+Pagination): blocks processing until pagination is done. Synonymous to using `start_pagination` with the `wait` parameter
+ - [next_page_results](README.md#Asynchronous+Pagination): gets next batch of results
+
 
 #### search
 
