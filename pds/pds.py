@@ -47,6 +47,7 @@ class People:
         self.last_query = None
 
         self.is_paginating = False
+        self.pagination_thread = None
         self.pagination_type = 'queue' 
         self.result_queue = queue.Queue()
         self.max_backlog = 5000
@@ -337,7 +338,8 @@ class People:
             # we don't care about the max_backlog slowdown if we're just accumulating everything
             self.max_backlog = None
 
-            self.pagination_thread.join()
+            if self.pagination_thread:
+                self.pagination_thread.join()
 
             logger.debug(f"Finished thread")
             if not self.result_queue.empty():
