@@ -260,8 +260,12 @@ class People:
         else:
             raise ValueError(f"Invalid type for pagination: ({self.pagination_type})")
 
+
+        self.is_paginating = True
         if len(response['results']) < self.batch_size:
             logger.debug(f"No need to paginate.")
+            # self.is_paginating = False
+
         else:
             self.pagination_thread = threading.Thread(target=self.pagination, args=())
             self.pagination_thread.start()
@@ -302,6 +306,7 @@ class People:
                 time.sleep(1)
                 response = self.next()
                 if response is None or response is {}:
+                    self.is_paginating = False
                     break
                 results = response['results']
                 total_results = response['total_count']
@@ -367,10 +372,11 @@ class People:
             Returns:
                 list: The next batch of results from the API, or an empty list if there are no more results.
             """
+
             start_time = time.time()
             while True:
-                if not self.is_paginating:
-                    return []
+                # if not self.is_paginating and :
+                #     return []
 
                 if self.pagination_type == 'queue':
                     if self.result_queue.qsize() > 0:
