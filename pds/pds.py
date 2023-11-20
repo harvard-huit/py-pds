@@ -384,10 +384,13 @@ class People:
                         self.result_queue.task_done()
                         return results
                     else:
+                        self.is_paginating = False
                         return []
                 elif self.pagination_type == 'list': 
                     results = self.results[:self.batch_size]
                     self.results = self.results[self.batch_size:]
+                    if len(self.results) < 1:
+                        self.is_paginating = False
                     return results
                 
                 # if we've been in this loop longer than <session_timeout> minutes, 
